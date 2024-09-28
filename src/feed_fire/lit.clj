@@ -139,8 +139,8 @@
    ;; TODO: replace with jblive.fm?
    [:podcast:contentLink
     {:href
-     "https://jupiter-hls.secdn.net/jupiter-channel/play/jupiter.smil/playlist.m3u8"}
-    "Stream the video"]])
+     "https://jblive.fm"}
+    "Stream the audio"]])
 
 (defn coder-live-item [{:keys [guid status start end title raw-description description]}]
   [:podcast:liveItem
@@ -202,6 +202,7 @@
       :fee "false",
       :customKey "906608",
       :customValue "01IMQkt4BFzAiSynxcQQqd"}]]
+   ;; TODO: correct values for coder
    #_[:podcast:chat
       {:protocol "nostr"
        :server "relay.fountain.fm"
@@ -324,11 +325,10 @@
         cleaned-feed (walk/prewalk (partial cleanup-element namespace->shortname) feed)]
     (with-meta cleaned-feed (meta feed))))
 
-;; download feed
 (defn download-feed [feed-url]
   (-> feed-url http/get :body (xml/parse-str :skip-whitespace true) cleanup-feed))
 
-;; extract any existing liveItem s
+;; TODO: cleanup (less imperative) or integrate with remove-live-items?
 (defn extract-live-item [feed]
   (let [feed-zip (hzip/hickory-zip feed)
         first-live-loc (hselect/select-next-loc (hselect/tag :podcast:liveItem) feed-zip)
@@ -388,9 +388,8 @@
 ;; ~~~~~~~~~~~~~~~~~~~ Main View ~~~~~~~~~~~~~~~~~~~
 
 (defn get-live-data [liveItem]
-  (if (not-empty (:podcast:liveItem liveItem))
-    (let [attrs (:podcast:liveItem liveItem)
-          guid (-> attrs :guid :content)
+  (if-let [attrs (not-empty (:podcast:liveItem liveItem))]
+    (let [guid (-> attrs :guid :content)
           status (-> attrs :status)
           start (-> attrs :start)
           title (-> attrs :title)
@@ -452,7 +451,6 @@
                                      (.format (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd'T'HH:mm")))}]
            [:label {:for "title"} "Title: "]
            [:input#title {:type "text" :name "title" :value (:title liveItemData)}]
-           ;; FIXME: bigger description box for markdown input
            [:label {:for "description"} "Description: "]
            [:textarea#description {:type "text" :name "description"} (:raw-description liveItemData)]
            [:input {:type "hidden" :name "guid" :value (:guid liveItemData)}]
@@ -476,6 +474,7 @@
                        "Authorization" token}})
   ;; podcast index update api
   (http/get (str "https://api.podcastindex.org/api/1.0/hub/pubnotify?url=" url "&pretty")))
+
 (defn feed->bucket [s3c bucket-name key-name content]
   (aws/invoke s3c {:op :PutObject
                    :request {:Bucket bucket-name
@@ -506,7 +505,8 @@
           feed-meta (meta updatedFeed)
           updatedFeed (if (contains? (-> feed-meta :clojure.data.xml/nss :p->u) "jb")
                         updatedFeed
-                        (assoc updatedFeed :attrs (assoc attrs :xmlns:jb "https://jupiterbroadcasing/jank")))
+                        ;; TODO: docs for the namespace
+                        (assoc updatedFeed :attrs (assoc attrs :xmlns:jb "https://feeds.jupiterbroadcasing.com/namespace")))
           feed-data (xml/indent-str updatedFeed)]
       ;; TODO: validation on show
       (feed->bucket s3-client "feeds" dest feed-data)
