@@ -18,160 +18,7 @@
             [reitit.ring.middleware.muuntaja :as muuntaja]
             [reitit.ring.middleware.parameters]))
 
-(defn- collapse-nested-lists [form]
-  (cond
-    (string? form)
-    form
-
-    (and (vector? form) (keyword? (first form)))
-    (->> form
-         (mapv #(if (seq? %) % [%]))
-         (apply concat)
-         (into []))
-
-    :else
-    form))
-
-(defn xmlhiccup->xmlparsed [tree]
-  (cond
-    (string? tree) tree
-    (number? tree) (str tree)
-    (keyword? tree) (str tree)
-    (contains? tree :content) tree
-    (and (vector tree) (= :cdata (first tree))) (clojure.data.xml.node.CData. (peek tree))
-    :else (let [metadata (meta tree)
-                tree (collapse-nested-lists tree)
-                [tag maybe-attrs & remain] tree
-                attrs? (map? maybe-attrs)
-                attrs (if attrs? maybe-attrs {})
-                content (if attrs? remain (concat [maybe-attrs] remain))]
-            (-> {:tag tag
-                 :attrs attrs
-                 :content (map xmlhiccup->xmlparsed content)}
-                (with-meta metadata)))))
-
-(defn xmlparsed->xmlhiccup [tree]
-  (if (or (string? tree) (instance? clojure.data.xml.node.CData tree))
-    (if (string? tree)
-      tree
-      [:cdata (:content tree)])
-    (let [tag (:tag tree)
-          attrs (:attrs tree)
-          content (:content tree)
-          metadata (meta tree)
-          ;; TODO: non-recusive version?
-          translated-content (map xmlparsed->xmlhiccup content)]
-      (with-meta
-        (if (empty? attrs)
-          ;; skip including empty attrs
-          (into [tag] translated-content)
-          (into [tag attrs] translated-content))
-        metadata))))
-
-(defn contains-many? [m ks]
-  (every? #(contains? m %) ks))
-
-(defn- is-element? [x]
-  (or (instance? clojure.data.xml.node.Element x)
-      (and (map? x)
-           (contains-many? x [:tag :attrs]))))
-
-(defn- u->p [feed]
-  (->> feed
-       meta
-       :clojure.data.xml/nss
-       :p->u
-       (into {}
-             (map
-              (fn [[p u]]
-                [(-> u xml/uri-symbol str) p])))))
-
-(defn- cleanup-key [namespace->shortname key]
-  (let [key-name (name key)
-        key-namespace (namespace key)
-        namespace-shortname (namespace->shortname key-namespace)]
-    (cond
-      ;; no namespace, just use key as is
-      (nil? namespace-shortname) key
-      (empty? namespace-shortname) (keyword key-name)
-      :else (keyword (str namespace-shortname ":" key-name)))))
-
-(defn- cleanup-element [namespace->shortname el]
-  (if-not (is-element? el)
-    el
-    (let [tag (:tag el)
-          new-tag (cleanup-key namespace->shortname tag)
-          attrs (:attrs el)
-          ;; TODO: actually needed? properly "undone" on render?
-          new-attrs (into {} (for [[k v] attrs]
-                               [(cleanup-key namespace->shortname k) v]))]
-      (assoc el :tag new-tag :attrs new-attrs))))
-
-(defn cleanup-feed [feed]
-  (let [namespace->shortname (u->p feed)
-        cleaned-feed (walk/prewalk (partial cleanup-element namespace->shortname) feed)]
-    (with-meta cleaned-feed (meta feed))))
-
-;; download feed
-(defn download-feed [feed-url]
-  (-> feed-url http/get :body (xml/parse-str :skip-whitespace true) cleanup-feed))
-
-;; extract any existing liveItem s
-(defn extract-live-item [feed]
-  (let [feed-zip (hzip/hickory-zip feed)
-        first-live-loc (hselect/select-next-loc (hselect/tag :podcast:liveItem) feed-zip)
-        first-live (if first-live-loc (zip/node first-live-loc) first-live-loc)
-        first-live-loc (when first-live-loc (zip/remove first-live-loc))
-        second-live-loc (when first-live-loc (hselect/select-next-loc (hselect/tag :podcast:liveItem) first-live-loc))]
-    (when second-live-loc
-      (println "MULTIPLE LIVE ITEMS: THIS IS UNSUPPORTED")
-      (throw (ex-info "multiple live items" {:first first-live :second (zip/node second-live-loc)})))
-    first-live))
-
-(defn remove-live-items [feed]
-  (let [z (hzip/hickory-zip feed)
-        init-loc (hselect/select-next-loc (hselect/tag :podcast:liveItem) z)]
-    (if-not init-loc
-      feed
-      (loop [loc init-loc]
-        (let [after-remove (zip/remove loc)
-              nxt (hselect/select-next-loc (hselect/tag :podcast:liveItem) after-remove)]
-          (if nxt
-            (recur nxt)
-            (zip/root after-remove)))))))
-
-(defn multi-tag-into [old new]
-  (if (= (count new) 1)
-    (let [[k v] (first new)]
-      (if (contains? old k)
-        (let [current-v (get old k)]
-          (if (vector? current-v)
-            (assoc old k (conj current-v v))
-            (assoc old k [current-v v])))
-        (assoc old k v)))
-    (into old new)))
-
-(defn element->data [item]
-  (if (not (map? item))
-    item
-    (let [{:keys [tag attrs content]} item]
-      (cond
-        ;; no attrs + 1 content = K:V pair
-        (and (empty? attrs) (= (count content) 1)) {tag (element->data (first content))}
-        ;; attrs + 1 content
-        (= (count content) 1)
-        (let [processed-content (-> content first element->data)]
-          (if (and (map? processed-content) (= (count processed-content) 1))
-            (let [[k v] (first processed-content)]
-              ;; if content is k/v pair, just use that
-              {tag (assoc (into {} attrs) k v)})
-            ;; otherwise add under a :content key
-            {tag (assoc (into {} attrs) :content processed-content)}))
-        ;; otherwise recurse
-        :else
-        {tag (reduce multi-tag-into (into {} attrs) (map element->data content))}))))
-
-  ;; save data or initialize new pending
+;; ~~~~~~~~~~~~~~~~~~~ Setup & Config ~~~~~~~~~~~~~~~~~~~
 
 (def podcastDateFormatter
   (java.time.format.DateTimeFormatter/ofPattern "EEE, dd MMM yyyy HH:mm:ss Z"))
@@ -179,6 +26,13 @@
 (defn pub-date []
   (.format (java.time.ZonedDateTime/now)
            podcastDateFormatter))
+
+(defn s3-client [account-id access-key secret-key]
+  (aws/client {:api :s3
+               :region "us-east-1" ;; TODO: need to put something? auto doesn't work. Seems to not matter with the endpoint override.
+               :endpoint-override {:protocol :https :hostname (str account-id ".r2.cloudflarestorage.com")}
+               :credentials-provider (aws-creds/basic-credentials-provider {:access-key-id access-key
+                                                                            :secret-access-key secret-key})}))
 
 (defn lup-live-item [{:keys [guid status start end title raw-description description]}]
   [:podcast:liveItem
@@ -366,26 +220,172 @@
      "https://jblive.fm"}
     "Stream the audio"]])
 
-;; remove liveItem s
-;; present form with current live item or new pending
-;; On SUBMIT
-  ;; add live item to pruned feed data
-  ;; render feed
-  ;; upload to s3
+(def FEEDS
+  {"coder" {:src "https://feeds.jupiterbroadcasting.com/coder"
+            :dest "rss/coder.xml"
+            :liveItem coder-live-item}
+   "lup" {:src "https://feeds.jupiterbroadcasting.com/lup"
+          :dest "rss/lup.xml"
+          :liveItem lup-live-item}})
 
-(defn s3-client [account-id access-key secret-key]
-  (aws/client {:api :s3
-               :region "us-east-1" ;; TODO: need to put something? auto doesn't work. Seems to not matter with the endpoint override.
-               :endpoint-override {:protocol :https :hostname (str account-id ".r2.cloudflarestorage.com")}
-               :credentials-provider (aws-creds/basic-credentials-provider {:access-key-id access-key
-                                                                            :secret-access-key secret-key})}))
+;; ~~~~~~~~~~~~~~~~~~~ Feed Processing ~~~~~~~~~~~~~~~~~~~
 
-(defn feed->bucket [s3c bucket-name key-name content]
-  (aws/invoke s3c {:op :PutObject
-                   :request {:Bucket bucket-name
-                             :Key key-name
-                             :Body (.getBytes content)
-                             :ContentType "application/xml"}}))
+(defn- collapse-nested-lists [form]
+  (cond
+    (string? form)
+    form
+
+    (and (vector? form) (keyword? (first form)))
+    (->> form
+         (mapv #(if (seq? %) % [%]))
+         (apply concat)
+         (into []))
+
+    :else
+    form))
+
+(defn xmlhiccup->xmlparsed [tree]
+  (cond
+    (string? tree) tree
+    (number? tree) (str tree)
+    (keyword? tree) (str tree)
+    (contains? tree :content) tree
+    (and (vector tree) (= :cdata (first tree))) (clojure.data.xml.node.CData. (peek tree))
+    :else (let [metadata (meta tree)
+                tree (collapse-nested-lists tree)
+                [tag maybe-attrs & remain] tree
+                attrs? (map? maybe-attrs)
+                attrs (if attrs? maybe-attrs {})
+                content (if attrs? remain (concat [maybe-attrs] remain))]
+            (-> {:tag tag
+                 :attrs attrs
+                 :content (map xmlhiccup->xmlparsed content)}
+                (with-meta metadata)))))
+
+(defn xmlparsed->xmlhiccup [tree]
+  (if (or (string? tree) (instance? clojure.data.xml.node.CData tree))
+    (if (string? tree)
+      tree
+      [:cdata (:content tree)])
+    (let [tag (:tag tree)
+          attrs (:attrs tree)
+          content (:content tree)
+          metadata (meta tree)
+          ;; TODO: non-recusive version?
+          translated-content (map xmlparsed->xmlhiccup content)]
+      (with-meta
+        (if (empty? attrs)
+          ;; skip including empty attrs
+          (into [tag] translated-content)
+          (into [tag attrs] translated-content))
+        metadata))))
+
+(defn contains-many? [m ks]
+  (every? #(contains? m %) ks))
+
+(defn- is-element? [x]
+  (or (instance? clojure.data.xml.node.Element x)
+      (and (map? x)
+           (contains-many? x [:tag :attrs]))))
+
+(defn- u->p [feed]
+  (->> feed
+       meta
+       :clojure.data.xml/nss
+       :p->u
+       (into {}
+             (map
+              (fn [[p u]]
+                [(-> u xml/uri-symbol str) p])))))
+
+(defn- cleanup-key [namespace->shortname key]
+  (let [key-name (name key)
+        key-namespace (namespace key)
+        namespace-shortname (namespace->shortname key-namespace)]
+    (cond
+      ;; no namespace, just use key as is
+      (nil? namespace-shortname) key
+      (empty? namespace-shortname) (keyword key-name)
+      :else (keyword (str namespace-shortname ":" key-name)))))
+
+(defn- cleanup-element [namespace->shortname el]
+  (if-not (is-element? el)
+    el
+    (let [tag (:tag el)
+          new-tag (cleanup-key namespace->shortname tag)
+          attrs (:attrs el)
+          ;; TODO: actually needed? properly "undone" on render?
+          new-attrs (into {} (for [[k v] attrs]
+                               [(cleanup-key namespace->shortname k) v]))]
+      (assoc el :tag new-tag :attrs new-attrs))))
+
+(defn cleanup-feed [feed]
+  (let [namespace->shortname (u->p feed)
+        cleaned-feed (walk/prewalk (partial cleanup-element namespace->shortname) feed)]
+    (with-meta cleaned-feed (meta feed))))
+
+;; download feed
+(defn download-feed [feed-url]
+  (-> feed-url http/get :body (xml/parse-str :skip-whitespace true) cleanup-feed))
+
+;; extract any existing liveItem s
+(defn extract-live-item [feed]
+  (let [feed-zip (hzip/hickory-zip feed)
+        first-live-loc (hselect/select-next-loc (hselect/tag :podcast:liveItem) feed-zip)
+        first-live (if first-live-loc (zip/node first-live-loc) first-live-loc)
+        first-live-loc (when first-live-loc (zip/remove first-live-loc))
+        second-live-loc (when first-live-loc (hselect/select-next-loc (hselect/tag :podcast:liveItem) first-live-loc))]
+    (when second-live-loc
+      (println "MULTIPLE LIVE ITEMS: THIS IS UNSUPPORTED")
+      (throw (ex-info "multiple live items" {:first first-live :second (zip/node second-live-loc)})))
+    first-live))
+
+(defn remove-live-items [feed]
+  (let [z (hzip/hickory-zip feed)
+        init-loc (hselect/select-next-loc (hselect/tag :podcast:liveItem) z)]
+    (if-not init-loc
+      feed
+      (loop [loc init-loc]
+        (let [after-remove (zip/remove loc)
+              nxt (hselect/select-next-loc (hselect/tag :podcast:liveItem) after-remove)]
+          (if nxt
+            (recur nxt)
+            (zip/root after-remove)))))))
+
+;; TODO: docs/revisit
+(defn multi-tag-into [old new]
+  (if (= (count new) 1)
+    (let [[k v] (first new)]
+      (if (contains? old k)
+        (let [current-v (get old k)]
+          (if (vector? current-v)
+            (assoc old k (conj current-v v))
+            (assoc old k [current-v v])))
+        (assoc old k v)))
+    (into old new)))
+
+;; TODO: docs/revisit
+(defn element->data [item]
+  (if (not (map? item))
+    item
+    (let [{:keys [tag attrs content]} item]
+      (cond
+        ;; no attrs + 1 content = K:V pair
+        (and (empty? attrs) (= (count content) 1)) {tag (element->data (first content))}
+        ;; attrs + 1 content
+        (= (count content) 1)
+        (let [processed-content (-> content first element->data)]
+          (if (and (map? processed-content) (= (count processed-content) 1))
+            (let [[k v] (first processed-content)]
+              ;; if content is k/v pair, just use that
+              {tag (assoc (into {} attrs) k v)})
+            ;; otherwise add under a :content key
+            {tag (assoc (into {} attrs) :content processed-content)}))
+        ;; otherwise recurse
+        :else
+        {tag (reduce multi-tag-into (into {} attrs) (map element->data content))}))))
+
+;; ~~~~~~~~~~~~~~~~~~~ Main View ~~~~~~~~~~~~~~~~~~~
 
 (defn get-live-data [liveItem]
   (if (not-empty (:podcast:liveItem liveItem))
@@ -409,30 +409,6 @@
      :raw-description "Undescribed live stream"
      :start (.format (java.time.ZonedDateTime/now (java.time.ZoneId/of "America/Los_Angeles"))
                      java.time.format.DateTimeFormatter/ISO_OFFSET_DATE_TIME)}))
-
-(defn insert-into-channel [feed subtree-hiccup]
-  (let [subtree (xmlhiccup->xmlparsed subtree-hiccup)
-        channel-zip (->> (hzip/hickory-zip feed)
-                         (hselect/select-next-loc
-                          (hselect/tag :channel)))
-        channel-with-sub (zip/insert-child channel-zip subtree)]
-    (zip/root channel-with-sub)))
-
-(def FEEDS
-  {"coder" {:src "https://feeds.jupiterbroadcasting.com/coder"
-            :dest "rss/coder.xml"
-            :liveItem coder-live-item}
-   "lup" {:src "https://feeds.jupiterbroadcasting.com/lup"
-          :dest "rss/lup.xml"
-          :liveItem lup-live-item}})
-
-(defn podping [{:keys [token url reason] :or {reason "update"}}]
-  ;; podping
-  (http/get (str "https://podping.cloud/?url=" url "&reason=" reason)
-            {:headers {"User-Agent" "JupiterBroadcasting"
-                       "Authorization" token}})
-  ;; podcast index update api
-  (http/get (str "https://api.podcastindex.org/api/1.0/hub/pubnotify?url=" url "&pretty")))
 
 (defn view [{{:strs [show] :or {show "coder"}} :params}]
   (let [feed (download-feed (-> FEEDS (get show) :src))
@@ -471,7 +447,9 @@
             [:option {:value "live" :selected (= "live" (:status liveItemData))} "live"]
             [:option {:value "ended" :selected (= "ended" (:status liveItemData))} "ended"]]
            [:label {:for "start"} "Start (JB Time: America/Los_Angeles): "]
-           [:input#start {:type "datetime-local", :name "start", :aria-label "Datetime local" :value (-> liveItemData :start java.time.ZonedDateTime/parse .toLocalDateTime (.format (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd'T'HH:mm")))}]
+           [:input#start {:type "datetime-local", :name "start", :aria-label "Datetime local"
+                          :value (-> liveItemData :start java.time.ZonedDateTime/parse .toLocalDateTime
+                                     (.format (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd'T'HH:mm")))}]
            [:label {:for "title"} "Title: "]
            [:input#title {:type "text" :name "title" :value (:title liveItemData)}]
            ;; FIXME: bigger description box for markdown input
@@ -481,22 +459,45 @@
            [:input {:type "hidden" :name "old_status" :value (:status liveItemData)}]
            [:input {:type "submit" :value "Update Live Item"}]]]]]])}))
 
+;; ~~~~~~~~~~~~~~~~~~~ Update View ~~~~~~~~~~~~~~~~~~~
+
+(defn insert-into-channel [feed subtree-hiccup]
+  (let [subtree (xmlhiccup->xmlparsed subtree-hiccup)
+        channel-zip (->> (hzip/hickory-zip feed)
+                         (hselect/select-next-loc
+                          (hselect/tag :channel)))
+        channel-with-sub (zip/insert-child channel-zip subtree)]
+    (zip/root channel-with-sub)))
+
+(defn podping [{:keys [token url reason] :or {reason "update"}}]
+  ;; podping
+  (http/get (str "https://podping.cloud/?url=" url "&reason=" reason)
+            {:headers {"User-Agent" "JupiterBroadcasting"
+                       "Authorization" token}})
+  ;; podcast index update api
+  (http/get (str "https://api.podcastindex.org/api/1.0/hub/pubnotify?url=" url "&pretty")))
+(defn feed->bucket [s3c bucket-name key-name content]
+  (aws/invoke s3c {:op :PutObject
+                   :request {:Bucket bucket-name
+                             :Key key-name
+                             :Body (.getBytes content)
+                             :ContentType "application/xml"}}))
+
 (defn update-feed [s3-client podping-token]
   (fn [{{:strs [guid title description old_status status start show]} :form-params :as request}]
     (let [{:keys [src dest liveItem] :as show-config} (get FEEDS show)
           feed (download-feed src)
           cleanFeed (remove-live-items feed)
+          parsed-start (.atZone (java.time.LocalDateTime/parse start) (java.time.ZoneId/of "America/Los_Angeles"))
           newLiveItem (liveItem {:guid (if (and (= old_status "ended") (not= status "ended")) (str (random-uuid)) guid)
                                  :title title
                                  :description (html/html (markdown/parse-body description))
                                  :raw-description description
                                  :status status
                                  :start (.format
-                                         (.atZone (java.time.LocalDateTime/parse start)
-                                                  (java.time.ZoneId/of "America/Los_Angeles"))
+                                         parsed-start
                                          java.time.format.DateTimeFormatter/ISO_OFFSET_DATE_TIME)
-                                 :end (.format (.plus (.atZone (java.time.LocalDateTime/parse start)
-                                                               (java.time.ZoneId/of "America/Los_Angeles"))
+                                 :end (.format (.plus parsed-start
                                                       2
                                                       java.time.temporal.ChronoUnit/HOURS)
                                                java.time.format.DateTimeFormatter/ISO_OFFSET_DATE_TIME)})
@@ -518,7 +519,6 @@
              [:html
               [:head
                [:script
-                  ;; TODO: redirect to correct show. Template string?
                 (str "function redirectAfterDelay() {
                             setTimeout(function() {
                                 window.location.href = '/?show=" show "';
@@ -533,7 +533,7 @@
                  :alt "Captain Picard, in a star trek uniform, is clapping his hands in front of a starry sky"
                  :style "max-width: 833px;"}]]]])}))
 
-;; ~~~~~~~~~~~ Top Level HTTP ~~~~~~~~~~~
+;; ~~~~~~~~~~~~~~~~~~~ HTTP Server ~~~~~~~~~~~~~~~~~~~
 
 (defn routes [s3-client podping-token]
   [["/" {:get {:handler view}}]
