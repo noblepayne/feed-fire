@@ -180,17 +180,126 @@
   (.format (java.time.ZonedDateTime/now)
            podcastDateFormatter))
 
-(defn live-item [{:keys [guid status start title raw-description description]}]
+(defn lup-live-item [{:keys [guid status start end title raw-description description]}]
   [:podcast:liveItem
    {:status status,
-    :start start}
+    :start start,
+    :end end}
    [:title title]
    [:itunes:subtitle title]
    [:description
-    (xml/cdata description)]
+    [:cdata description]]
    [:itunes:summary
-    (xml/cdata description)]
-   [:jb:rawDescription (xml/cdata raw-description)]
+    [:cdata description]]
+   [:jb:rawDescription
+    [:cdata raw-description]]
+   [:enclosure
+    {:length "33",
+     :type "audio/mpeg",
+     :url "https://jblive.fm"}]
+   [:podcast:alternateEnclosure
+    {:type "application/vnd.apple.mpegurl"
+     :length "33"
+     :default true
+     :title "HLS"}
+    [:podcast:source {:uri "https://jupiter-hls.secdn.net/jupiter-channel/play/jupiter.smil/playlist.m3u8"}]]
+   [:guid
+    {:isPermaLink "false"}
+    guid]
+   [:itunes:image
+    {:href
+     "https://station.us-iad-1.linodeobjects.com/art/lup-mp3.jpg"}]
+   [:link {} "http://jblive.fm"]
+   [:podcast:person {:group "cast"
+                     :role "host"
+                     :href "https://chrislas.com"
+                     :img "https://www.jupiterbroadcasting.com/images/people/chris.jpg"}
+    "Chris Fisher"]
+   [:podcast:person {:group "cast"
+                     :role "host"
+                     :href "https://www.jupiterbroadcasting.com/hosts/wes"
+                     :img "https://www.jupiterbroadcasting.com/images/people/wes.jpg"}
+    "Wes Payne"]
+   [:podcast:person {:group "cast"
+                     :role "host"
+                     :href "https://www.jupiterbroadcasting.com/hosts/brent/"
+                     :img "https://www.jupiterbroadcasting.com/images/people/brent.jpg"}
+    "Brent Gervais"]
+   [:podcast:value
+    {:type "lightning", :method "keysend", :suggested "0.00000005000"}
+    [:podcast:valueRecipient
+     {:name "JB Node",
+      :type "node",
+      :address
+      "037d284d2d7e6cec7623adbe600450a73b42fb90800989f05a862464b05408df39",
+      :split "9"
+      :fee "false"}]
+    ;; Chris' NodeCan
+    [:podcast:valueRecipient
+     {:name "Chris",
+      :type "node",
+      :address
+      "03de23d27775ff1abc1d5770e56ee058464c9fcd4cc39837e605646e95aaf5f8f4",
+      :split "30"}]
+    [:podcast:valueRecipient
+     {:name "Wes",
+      :type "node",
+      :address
+      "030a58b8653d32b99200a2334cfe913e51dc7d155aa0116c176657a4f1722677a3",
+      :customKey "696969",
+      :customValue "peDa7Jzh9Hc7VO87yDg5",
+      :split "30"}]
+    [:podcast:valueRecipient
+     {:name "Brent",
+      :type "node",
+      :address
+      "030a58b8653d32b99200a2334cfe913e51dc7d155aa0116c176657a4f1722677a3",
+      :customKey "696969",
+      :customValue "VaVYZFXrIzAxALMAztmo",
+      :split "30"}]
+    [:podcast:valueRecipient
+     {:name "Fountain Bot",
+      :type "node",
+      :address
+      "03b6f613e88bd874177c28c6ad83b3baba43c4c656f56be1f8df84669556054b79",
+      :split "1",
+      :fee "false",
+      :customKey "906608",
+      :customValue "01IMQkt4BFzAiSynxcQQqd"}]]
+   [:podcast:images
+    {:srcset
+     "https://station.us-iad-1.linodeobjects.com/art/lup-mp3.jpg 3000w"}]
+   [:podcast:chat
+    {:protocol "nostr"
+     :server "relay.fountain.fm"
+     :accountId "npub1ddngs6e6m4evw7wjqkl9wnkz6l8vvxgxrtp7w4ch8zdjv3ze38jqcg3uu5"
+     :space (str "30311:6b66886b3add72c779d205be574ec2d7cec619061ac3e75717389b26445989e4:" guid)}]
+   ;; [:podcast:chat
+   ;;  {:server "https://bit.ly/jointhematrix",
+   ;;   :protocol "matrix",
+   ;;   :space "Jupiter Broadcasting"}]
+   [:pubDate {} (pub-date)]
+   [:itunes:explicit {} "No"]
+   [:author {} "Jupiter Broadcasting"]
+   [:itunes:author {} "Jupiter Broadcasting"]
+   ;; TODO: replace with jblive.fm?
+   [:podcast:contentLink
+    {:href
+     "https://jupiter-hls.secdn.net/jupiter-channel/play/jupiter.smil/playlist.m3u8"}
+    "Stream the video"]])
+
+(defn coder-live-item [{:keys [guid status start end title raw-description description]}]
+  [:podcast:liveItem
+   {:status status,
+    :start start
+    :end end}
+   [:title [:cdata title]]
+   [:itunes:subtitle [:cdata title]]
+   [:description
+    [:cdata description]]
+   [:itunes:summary
+    [:cdata description]]
+   [:jb:rawDescription  [:cdata raw-description]]
    [:enclosure
     {:length "33",
      :type "audio/mpeg",
@@ -239,11 +348,11 @@
       :fee "false",
       :customKey "906608",
       :customValue "01IMQkt4BFzAiSynxcQQqd"}]]
-   [:podcast:chat
-    {:protocol "nostr"
-     :server "relay.fountain.fm"
-     :accountId "npub1ddngs6e6m4evw7wjqkl9wnkz6l8vvxgxrtp7w4ch8zdjv3ze38jqcg3uu5"
-     :space (str "30311:6b66886b3add72c779d205be574ec2d7cec619061ac3e75717389b26445989e4:" guid)}]
+   #_[:podcast:chat
+      {:protocol "nostr"
+       :server "relay.fountain.fm"
+       :accountId "npub1ddngs6e6m4evw7wjqkl9wnkz6l8vvxgxrtp7w4ch8zdjv3ze38jqcg3uu5"
+       :space (str "30311:6b66886b3add72c779d205be574ec2d7cec619061ac3e75717389b26445989e4:" guid)}]
    ;; [:podcast:chat
    ;;  {:server "https://bit.ly/jointhematrix",
    ;;   :protocol "matrix",
@@ -285,8 +394,8 @@
           status (-> attrs :status)
           start (-> attrs :start)
           title (-> attrs :title)
-          description (-> attrs :description :content)
-          raw-description (-> attrs :jb:rawDescription :content)]
+          description (-> attrs :description)
+          raw-description (-> attrs :jb:rawDescription)]
       {:guid guid
        :status status
        :title title
@@ -299,7 +408,7 @@
      :description "Undescribed live stream"
      :raw-description "Undescribed live stream"
      :start (.format (java.time.ZonedDateTime/now (java.time.ZoneId/of "America/Los_Angeles"))
-                     (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd'T'HH:mm:ss"))}))
+                     java.time.format.DateTimeFormatter/ISO_OFFSET_DATE_TIME)}))
 
 (defn insert-into-channel [feed subtree-hiccup]
   (let [subtree (xmlhiccup->xmlparsed subtree-hiccup)
@@ -309,8 +418,24 @@
         channel-with-sub (zip/insert-child channel-zip subtree)]
     (zip/root channel-with-sub)))
 
-(defn view [request]
-  (let [feed (download-feed #_"https://extras.show/rss" "https://feeds.jupiterbroadcasting.com/rss/test.xml")
+(def FEEDS
+  {"coder" {:src "https://feeds.jupiterbroadcasting.com/coder"
+            :dest "rss/coder.xml"
+            :liveItem coder-live-item}
+   "lup" {:src "https://feeds.jupiterbroadcasting.com/lup"
+          :dest "rss/lup.xml"
+          :liveItem lup-live-item}})
+
+(defn podping [{:keys [token url reason] :or {reason "update"}}]
+  ;; podping
+  (http/get (str "https://podping.cloud/?url=" url "&reason=" reason)
+            {:headers {"User-Agent" "JupiterBroadcasting"
+                       "Authorization" token}})
+  ;; podcast index update api
+  (http/get (str "https://api.podcastindex.org/api/1.0/hub/pubnotify?url=" url "&pretty")))
+
+(defn view [{{:strs [show] :or {show "coder"}} :params}]
+  (let [feed (download-feed (-> FEEDS (get show) :src))
         liveItem (element->data (extract-live-item feed))
         liveItemData (get-live-data liveItem)]
     {:status 200
@@ -323,42 +448,58 @@
          [:meta {:charset "utf-8"}]
          [:meta {:name "viewport", :content "width=device-width, initial-scale=1"}]
          [:meta {:name "color-scheme", :content "light dark"}]
-         [:meta {:http-equiv "refresh", :content "60"}]
+         [:script {:type "text/javascript"}
+          "function navOnShowSelect() {
+             var selectedValue = this.event.target.value;
+             if (selectedValue) {
+               window.location.href = '/?show=' + selectedValue;
+             }
+           }"]
          [:title "LIVE!"]
          [:link {:rel "stylesheet" :href "https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.classless.min.css"}]]
         [:body
          [:main
           [:h1 "Coder Radio LIVE!"]
           [:form {:action "/update" :method "post"}
+           [:show {:for "show"} "Show: "]
+           [:select#show {:name "show" :onchange "navOnShowSelect();"}
+            [:option {:value "coder" :selected (= show "coder")} "coder"]
+            [:option {:value "lup" :selected (= show "lup")} "lup"]]
            [:label {:for "status"} "Status: "]
            [:select#status {:name "status"}
             [:option {:value "pending" :selected (= "pending" (:status liveItemData))} "pending"]
             [:option {:value "live" :selected (= "live" (:status liveItemData))} "live"]
             [:option {:value "ended" :selected (= "ended" (:status liveItemData))} "ended"]]
            [:label {:for "start"} "Start (JB Time: America/Los_Angeles): "]
-           [:input#start {:type "datetime-local", :name "start", :aria-label "Datetime local" :value (.toLocalDateTime (java.time.ZonedDateTime/parse (:start liveItemData)))}]
+           [:input#start {:type "datetime-local", :name "start", :aria-label "Datetime local" :value (-> liveItemData :start java.time.ZonedDateTime/parse .toLocalDateTime (.format (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd'T'HH:mm")))}]
            [:label {:for "title"} "Title: "]
            [:input#title {:type "text" :name "title" :value (:title liveItemData)}]
            ;; FIXME: bigger description box for markdown input
            [:label {:for "description"} "Description: "]
-           [:input#description {:type "text" :name "description" :value (:raw-description liveItemData)}]
+           [:textarea#description {:type "text" :name "description"} (:raw-description liveItemData)]
            [:input {:type "hidden" :name "guid" :value (:guid liveItemData)}]
            [:input {:type "hidden" :name "old_status" :value (:status liveItemData)}]
            [:input {:type "submit" :value "Update Live Item"}]]]]]])}))
 
-(defn update-feed [s3-client]
-  (fn [{{:strs [guid title description old_status status start]} :form-params :as request}]
-    (let [feed (download-feed  #_"https://extras.show/rss" "https://feeds.jupiterbroadcasting.com/rss/test.xml")
+(defn update-feed [s3-client podping-token]
+  (fn [{{:strs [guid title description old_status status start show]} :form-params :as request}]
+    (let [{:keys [src dest liveItem] :as show-config} (get FEEDS show)
+          feed (download-feed src)
           cleanFeed (remove-live-items feed)
-          newLiveItem (live-item {:guid (if (and (= old_status "ended") (not= status "ended")) (str (random-uuid)) guid)
-                                  :title title
-                                  :description (html/html (markdown/parse-body description))
-                                  :raw-description description
-                                  :status status
-                                  :start (.format
-                                          (.atZone (java.time.LocalDateTime/parse start)
-                                                   (java.time.ZoneId/of "America/Los_Angeles"))
-                                          java.time.format.DateTimeFormatter/ISO_OFFSET_DATE_TIME)})
+          newLiveItem (liveItem {:guid (if (and (= old_status "ended") (not= status "ended")) (str (random-uuid)) guid)
+                                 :title title
+                                 :description (html/html (markdown/parse-body description))
+                                 :raw-description description
+                                 :status status
+                                 :start (.format
+                                         (.atZone (java.time.LocalDateTime/parse start)
+                                                  (java.time.ZoneId/of "America/Los_Angeles"))
+                                         java.time.format.DateTimeFormatter/ISO_OFFSET_DATE_TIME)
+                                 :end (.format (.plus (.atZone (java.time.LocalDateTime/parse start)
+                                                               (java.time.ZoneId/of "America/Los_Angeles"))
+                                                      2
+                                                      java.time.temporal.ChronoUnit/HOURS)
+                                               java.time.format.DateTimeFormatter/ISO_OFFSET_DATE_TIME)})
           updatedFeed (insert-into-channel cleanFeed newLiveItem)
           attrs (:attrs updatedFeed)
           feed-meta (meta updatedFeed)
@@ -366,37 +507,42 @@
                         updatedFeed
                         (assoc updatedFeed :attrs (assoc attrs :xmlns:jb "https://jupiterbroadcasing/jank")))
           feed-data (xml/indent-str updatedFeed)]
-      (feed->bucket s3-client "feeds" "rss/test.xml" feed-data)
-      {:status 200 :headers {"content-type" "text/html"}
-       :body (html/html
-              [html/doctype-html5
-               [:html
-                [:head
-                 [:script
-                  (str "function redirectAfterDelay() {
+      ;; TODO: validation on show
+      (feed->bucket s3-client "feeds" dest feed-data)
+      (podping {:token podping-token :url src :reason (case "pending" "update"
+                                                              "live" "live"
+                                                              "ended" "liveEnd")}))
+    {:status 200 :headers {"content-type" "text/html"}
+     :body (html/html
+            [html/doctype-html5
+             [:html
+              [:head
+               [:script
+                  ;; TODO: redirect to correct show. Template string?
+                (str "function redirectAfterDelay() {
                             setTimeout(function() {
-                                window.location.href = '/';
+                                window.location.href = '/?show="show"';
                             }, 5000);
                         }
                         window.onload = redirectAfterDelay;")]]
-                [:body
-                 [:img
-                  {:src "https://media1.tenor.com/m/j5wzOHldDm0AAAAC/applause-picard.gif"
-                   :width "833"
-                   :height "625.5863453815261"
-                   :alt "Captain Picard, in a star trek uniform, is clapping his hands in front of a starry sky"
-                   :style "max-width: 833px;"}]]]])})))
+              [:body
+               [:img
+                {:src "https://media1.tenor.com/m/j5wzOHldDm0AAAAC/applause-picard.gif"
+                 :width "833"
+                 :height "625.5863453815261"
+                 :alt "Captain Picard, in a star trek uniform, is clapping his hands in front of a starry sky"
+                 :style "max-width: 833px;"}]]]])}))
 
 ;; ~~~~~~~~~~~ Top Level HTTP ~~~~~~~~~~~
 
-(defn routes [s3-client]
+(defn routes [s3-client podping-token]
   [["/" {:get {:handler view}}]
-   ["/update" {:post {:handler (update-feed s3-client)}}]])
+   ["/update" {:post {:handler (update-feed s3-client podping-token)}}]])
 
-(defn http-handler [s3-client]
+(defn http-handler [s3-client podping-token]
   (ring/ring-handler
    (ring/router
-    (routes s3-client)
+    (routes s3-client podping-token)
     {:data {:muuntaja m/instance
             :middleware [muuntaja/format-middleware
                          reitit.ring.middleware.parameters/parameters-middleware]}})
@@ -413,9 +559,9 @@
       deferred)))
 
 (defn serve
-  [s3-client]
+  [s3-client podping-token]
   (httpd/start-server
-   (make-virtual (http-handler s3-client))
+   (make-virtual (http-handler s3-client podping-token))
    {:port 4444
     ;; When other than :none our handler is run on a thread pool.
     ;; As we are wrapping our handler in a new virtual thread per request
@@ -424,18 +570,18 @@
     :executor :none}))
 
 (defn -main [& _]
-  (httpd/start-server
-   (make-virtual
-    (http-handler
-     (s3-client (System/getenv "CF_ACCOUNT_ID")
-                (System/getenv "CF_ACCESS_KEY")
-                (System/getenv "CF_SECRET_KEY"))))
-   {:port 4444 :executor :none}))
+  (serve
+   (s3-client (System/getenv "CF_ACCOUNT_ID")
+              (System/getenv "CF_ACCESS_KEY")
+              (System/getenv "CF_SECRET_KEY"))
+   (System/getenv "PODPING_API_KEY")))
 
 (comment
   (def  s3c (s3-client (System/getenv "CF_ACCOUNT_ID")
                        (System/getenv "CF_ACCESS_KEY")
                        (System/getenv "CF_SECRET_KEY")))
-  (feed->bucket s3c "feeds" "rss/test.txt" "abc123")
-  (def handler (make-virtual (http-handler s3c)))
-  (def server (httpd/start-server #'handler  {:port 4444 :executor :none})))
+  (def PODPING_API_KEY (System/getenv "PODPING_API_KEY"))
+
+  (def handler (make-virtual (http-handler s3c PODPING_API_KEY)))
+  (def server (httpd/start-server #'handler  {:port 4444 :executor :none}))
+  (.close server))
