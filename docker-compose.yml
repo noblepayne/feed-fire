@@ -1,0 +1,7 @@
+services:
+  feed-fire:
+    image: feed-fire:latest
+    ports:
+      - "4444:4444"
+    env_file:
+      - .env

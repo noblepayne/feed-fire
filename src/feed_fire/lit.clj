@@ -510,8 +510,8 @@
       ;; TODO: validation on show
       (feed->bucket s3-client "feeds" dest feed-data)
       (podping {:token podping-token :url src :reason (case "pending" "update"
-                                                              "live" "live"
-                                                              "ended" "liveEnd")}))
+                                                            "live" "live"
+                                                            "ended" "liveEnd")}))
     {:status 200 :headers {"content-type" "text/html"}
      :body (html/html
             [html/doctype-html5
@@ -521,7 +521,7 @@
                   ;; TODO: redirect to correct show. Template string?
                 (str "function redirectAfterDelay() {
                             setTimeout(function() {
-                                window.location.href = '/?show="show"';
+                                window.location.href = '/?show=" show "';
                             }, 5000);
                         }
                         window.onload = redirectAfterDelay;")]]

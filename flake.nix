@@ -81,12 +81,13 @@
     packages =
       builtins.mapAttrs (system: pkgs: {
         deps-lock = clj-nix.packages.${system}.deps-lock;
-        #container = pkgs.dockerTools.buildLayeredImage {
-        #  name = "lnd-boost-scraper";
-        #  config = {
-        #    Entrypoint = ["${self.packages.${system}.default}/bin/lnd-boost-scraper"];
-        #  };
-        #};
+        container = pkgs.dockerTools.buildLayeredImage {
+          name = "feed-fire";
+          tag = "latest";
+          config = {
+            Entrypoint = ["${self.packages.${system}.default}/bin/feed-fire"];
+          };
+        };
         default = clj-nix.lib.mkCljApp {
           inherit pkgs;
           modules = [
