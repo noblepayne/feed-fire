@@ -402,8 +402,10 @@
        :title title
        :description description
        :raw-description raw-description
-       :start start})
-    {:guid (str (random-uuid))
+       :start start
+       :new false})
+    {:new true
+     :guid (str (random-uuid))
      :status "pending"
      :title "Untitled Live Stream"
      :description "Undescribed live stream"
@@ -442,7 +444,7 @@
            [:select#show {:name "show" :onchange "navOnShowSelect();"}
             [:option {:value "coder" :selected (= show "coder")} (-> (get FEEDS "coder") :title)]
             [:option {:value "lup" :selected (= show "lup")} (-> (get FEEDS "lup") :title)]]
-           [:label {:for "status"} "Status: "]
+           [:label {:for "status"} (str "Status: " (when (:new liveItemData) "(NEW)"))]
            [:select#status {:name "status"}
             [:option {:value "pending" :selected (= "pending" (:status liveItemData))} "pending"]
             [:option {:value "live" :selected (= "live" (:status liveItemData))} "live"]
@@ -588,6 +590,7 @@
                        (System/getenv "CF_SECRET_KEY")))
   (def PODPING_API_KEY (System/getenv "PODPING_API_KEY"))
 
+  (def server (-main))
   (def handler (make-virtual (http-handler s3c PODPING_API_KEY)))
   (def server (httpd/start-server #'handler  {:port 4444 :executor :none}))
   (.close server))

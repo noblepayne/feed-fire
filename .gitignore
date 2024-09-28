@@ -6,3 +6,4 @@
 .lsp
 .nrepl-port
 result
+*.tar*
