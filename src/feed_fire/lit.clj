@@ -222,10 +222,12 @@
     "Stream the audio"]])
 
 (def FEEDS
-  {"coder" {:src "https://feeds.jupiterbroadcasting.com/coder"
+  {"coder" {:title "Coder Radio"
+            :src "https://feeds.jupiterbroadcasting.com/coder"
             :dest "rss/coder.xml"
             :liveItem coder-live-item}
-   "lup" {:src "https://feeds.jupiterbroadcasting.com/lup"
+   "lup" {:title "LINUX Unplugged"
+          :src "https://feeds.jupiterbroadcasting.com/lup"
           :dest "rss/lup.xml"
           :liveItem lup-live-item}})
 
@@ -434,12 +436,12 @@
          [:link {:rel "stylesheet" :href "https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.classless.min.css"}]]
         [:body
          [:main
-          [:h1 "Coder Radio LIVE!"]
+          [:h1 (str (-> (get FEEDS show) :title) " LIVE!")]
           [:form {:action "/update" :method "post"}
            [:show {:for "show"} "Show: "]
            [:select#show {:name "show" :onchange "navOnShowSelect();"}
-            [:option {:value "coder" :selected (= show "coder")} "coder"]
-            [:option {:value "lup" :selected (= show "lup")} "lup"]]
+            [:option {:value "coder" :selected (= show "coder")} (-> (get FEEDS "coder") :title)]
+            [:option {:value "lup" :selected (= show "lup")} (-> (get FEEDS "lup") :title)]]
            [:label {:for "status"} "Status: "]
            [:select#status {:name "status"}
             [:option {:value "pending" :selected (= "pending" (:status liveItemData))} "pending"]
@@ -560,14 +562,18 @@
 
 (defn serve
   [s3-client podping-token]
-  (httpd/start-server
-   (make-virtual (http-handler s3-client podping-token))
-   {:port 4444
+  (let [env (or (System/getenv "ENV") "PROD")
+        dev (= env "DEV")
+        handler-factory (fn [] (make-virtual (http-handler s3-client podping-token)))
+        handler (if dev (ring/reloading-ring-handler handler-factory) (handler-factory))]
+    (httpd/start-server
+     handler
+     {:port 4444
     ;; When other than :none our handler is run on a thread pool.
     ;; As we are wrapping our handler in a new virtual thread per request
     ;; on our own, we have no risk of blocking the (aleph) handler thread and
     ;; don't need an additional threadpool onto which to offload.
-    :executor :none}))
+      :executor :none})))
 
 (defn -main [& _]
   (serve

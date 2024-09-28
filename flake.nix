@@ -52,6 +52,10 @@
                 # N.B. picks up quotes and inline comments
                 dotenv.enable = true;
 
+                env = {
+                  ENV = "DEV";
+                };
+
                 scripts.format.exec = ''
                   nix fmt
                   cljfmt fix .
