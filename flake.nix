@@ -71,6 +71,9 @@
                 scripts.build.exec = ''
                   nix build .
                 '';
+                scripts.repl.exec = ''
+                  clj -Sdeps '{:deps {cider/cider-nrepl {:mvn/version "0.50.0"} }}' -M -m nrepl.cmdline --middleware "[cider.nrepl/cider-middleware]" -b "0.0.0.0" -p 9998
+                '';
 
                 enterShell = ''
                   # start editor
