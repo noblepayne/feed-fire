@@ -95,7 +95,8 @@
       :address
       "03de23d27775ff1abc1d5770e56ee058464c9fcd4cc39837e605646e95aaf5f8f4",
       :split "30"}]
-    [:podcast:valueRecipient
+    ;; TODO: remove legacy alby
+    #_[:podcast:valueRecipient
      {:name "Wes",
       :type "node",
       :address
@@ -104,12 +105,18 @@
       :customValue "peDa7Jzh9Hc7VO87yDg5",
       :split "30"}]
     [:podcast:valueRecipient
+     {:name "Wes",
+      :type "node",
+      :address
+      "02e91ff08cba7981d73dd56fbb3e9123b101c9c94aafd27a7d70094ae479ba2c18",
+      :split "30"}]
+    [:podcast:valueRecipient
      {:name "Brent",
       :type "node",
       :address
-      "030a58b8653d32b99200a2334cfe913e51dc7d155aa0116c176657a4f1722677a3",
+      "022be9317c82371b76a8e57f96139fc9537f0cee52c649488405072c8c7ab4d601",
       :customKey "696969",
-      :customValue "VaVYZFXrIzAxALMAztmo",
+      :customValue "9",
       :split "30"}]
     [:podcast:valueRecipient
      {:name "Fountain Bot",
