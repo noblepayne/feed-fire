@@ -86,7 +86,7 @@
       :type "node",
       :address
       "037d284d2d7e6cec7623adbe600450a73b42fb90800989f05a862464b05408df39",
-      :split "9"
+      :split "10"
       :fee "false"}]
     ;; Chris' NodeCan
     [:podcast:valueRecipient
@@ -118,7 +118,7 @@
       :customKey "696969",
       :customValue "9",
       :split "30"}]
-    [:podcast:valueRecipient
+    #_[:podcast:valueRecipient
      {:name "Fountain Bot",
       :type "node",
       :address
