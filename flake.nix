@@ -1,8 +1,10 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    #nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-25.05";
+    project-pin.url = "github:noblepayne/project-pin";
+    nixpkgs.follows = "project-pin/nixpkgs";
     devenv.url = "github:cachix/devenv";
-    devenv.inputs.nixpkgs.follows = "nixpkgs";
+    #devenv.inputs.nixpkgs.follows = "nixpkgs";
     clj-nix.url = "github:jlesquembre/clj-nix";
     clj-nix.inputs.nixpkgs.follows = "nixpkgs";
   };

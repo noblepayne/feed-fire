@@ -63,7 +63,7 @@
    [:itunes:image
     {:href
      "https://station.us-iad-1.linodeobjects.com/art/lup-mp3.jpg"}]
-   [:link {} "http://jblive.fm"]
+   [:link {} "http://jblive.tv"]
    [:podcast:person {:group "cast"
                      :role "host"
                      :href "https://chrislas.com"
@@ -97,13 +97,13 @@
       :split "30"}]
     ;; TODO: remove legacy alby
     #_[:podcast:valueRecipient
-     {:name "Wes",
-      :type "node",
-      :address
-      "030a58b8653d32b99200a2334cfe913e51dc7d155aa0116c176657a4f1722677a3",
-      :customKey "696969",
-      :customValue "peDa7Jzh9Hc7VO87yDg5",
-      :split "30"}]
+       {:name "Wes",
+        :type "node",
+        :address
+        "030a58b8653d32b99200a2334cfe913e51dc7d155aa0116c176657a4f1722677a3",
+        :customKey "696969",
+        :customValue "peDa7Jzh9Hc7VO87yDg5",
+        :split "30"}]
     [:podcast:valueRecipient
      {:name "Wes",
       :type "node",
@@ -119,14 +119,14 @@
       :customValue "9",
       :split "30"}]
     #_[:podcast:valueRecipient
-     {:name "Fountain Bot",
-      :type "node",
-      :address
-      "03b6f613e88bd874177c28c6ad83b3baba43c4c656f56be1f8df84669556054b79",
-      :split "1",
-      :fee "false",
-      :customKey "906608",
-      :customValue "01IMQkt4BFzAiSynxcQQqd"}]]
+       {:name "Fountain Bot",
+        :type "node",
+        :address
+        "03b6f613e88bd874177c28c6ad83b3baba43c4c656f56be1f8df84669556054b79",
+        :split "1",
+        :fee "false",
+        :customKey "906608",
+        :customValue "01IMQkt4BFzAiSynxcQQqd"}]]
    [:podcast:images
     {:srcset
      "https://station.us-iad-1.linodeobjects.com/art/lup-mp3.jpg 3000w"}]
@@ -146,8 +146,8 @@
    ;; TODO: replace with jblive.fm?
    [:podcast:contentLink
     {:href
-     "https://jblive.fm"}
-    "Stream the audio"]])
+     "https://jblive.tv"}
+    "Stream the show"]])
 
 (defn coder-live-item [{:keys [guid status start end title raw-description description]}]
   [:podcast:liveItem
